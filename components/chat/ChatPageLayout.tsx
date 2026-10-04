@@ -976,7 +976,7 @@ export function ChatPageLayout(props: ChatPageLayoutProps) {
 
               {/* Center: memory dates (and an overlay slot for the editor toolbar) OR hour pill */}
               {memoryOverlayOpen ? (
-                <div className="relative min-w-0 flex-1 flex items-center justify-center">
+                <div className="relative h-full min-w-0 flex-1 flex items-center justify-center">
                   {/* Portal target for MemoryPreview's formatting toolbar (shown only while editing) */}
                   <div
                     id="db-memory-topbar-toolbar"

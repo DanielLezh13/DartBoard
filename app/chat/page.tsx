@@ -1687,6 +1687,7 @@ export default function ChatPage() {
                                   if (isGuest) {
                                     unstable_batchedUpdates(() => {
                                       setDraftMemory({
+                                        created_at: new Date().toISOString(),
                                         title: "Untitled",
                                         summary: draftPayload.summary,
                                         session_id: draftPayload.session_id,
@@ -1701,6 +1702,7 @@ export default function ChatPage() {
                                   // Signed-in flow: open draft immediately, then fill title when async generation resolves.
                                   unstable_batchedUpdates(() => {
                                     setDraftMemory({
+                                      created_at: new Date().toISOString(),
                                       title: "",
                                       summary: draftPayload.summary,
                                       session_id: draftPayload.session_id,
@@ -3006,6 +3008,7 @@ export default function ChatPage() {
     const folderId = currentFolder?.id ?? null;
     
     const draft = {
+      created_at: new Date().toISOString(),
       title: "Untitled",
       summary: "",
       session_id: activeSessionIdRef.current ?? null,

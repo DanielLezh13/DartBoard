@@ -109,12 +109,21 @@ export function MemoryReaderOverlay({
   const [contentVisible, setContentVisible] = React.useState(true);
   const swapTimerRef = React.useRef<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const latestMemoryRef = React.useRef(memory);
+  const latestDraftRef = React.useRef(draftMemory);
+
+  React.useEffect(() => {
+    latestMemoryRef.current = memory;
+    latestDraftRef.current = draftMemory;
+  }, [memory, draftMemory]);
 
   // Only animate on open/close. Swapping `memory` or `draftMemory` should not collapse/expand the overlay.
   React.useEffect(() => {
     if (open) {
       setMounted(true);
       setVisible(false);
+      const memory = latestMemoryRef.current;
+      const draftMemory = latestDraftRef.current;
       // Always update displayed memory/draft when opening, even if prop is temporarily null
       // This ensures we don't get stuck with stale state from previous memory
       if (memory) {
@@ -162,9 +171,12 @@ export function MemoryReaderOverlay({
         });
         return;
       }
-      // Draft changed - swap it (only if content changes, not title)
-      if (displayedDraft.summary !== draftMemory.summary) {
-        onToolbarVisibleChange?.(false);
+      // A new draft gets a fresh editor; generated title updates keep the current one.
+      if (
+        displayedDraft.created_at !== draftMemory.created_at ||
+        displayedDraft.summary !== draftMemory.summary ||
+        displayedDraft.doc_json !== draftMemory.doc_json
+      ) {
         if (swapTimerRef.current != null) {
           window.clearTimeout(swapTimerRef.current);
           swapTimerRef.current = null;
@@ -224,9 +236,6 @@ export function MemoryReaderOverlay({
       return;
     }
 
-    // Hide any topbar toolbar during swap (prevents stale toolbar from lingering).
-    onToolbarVisibleChange?.(false);
-
     // Cancel any in-flight swap.
     if (swapTimerRef.current != null) {
       window.clearTimeout(swapTimerRef.current);
@@ -254,13 +263,16 @@ export function MemoryReaderOverlay({
   }, [
     open,
     mounted,
+    memory,
     memory?.id,
     memory?.folder_name,
     memory?.title,
     memory?.summary,
+    memory?.doc_json,
     memory?.excerpt,
     memory?.tags,
     memory?.importance,
+    displayedMemory,
     displayedMemory?.id,
     draftMemory,
     displayedDraft,
@@ -275,7 +287,7 @@ export function MemoryReaderOverlay({
     if (displayedDraft.summary === draftMemory.summary && displayedDraft.title !== draftMemory.title) {
       setDisplayedDraft(draftMemory);
     }
-  }, [draftMemory?.title, open, mounted, displayedDraft?.summary, displayedDraft?.title]);
+  }, [draftMemory, displayedDraft, open, mounted]);
 
   // Cleanup displayed memory/draft on unmount end (so close animation can run even if props clear early).
   React.useEffect(() => {
@@ -356,6 +368,7 @@ export function MemoryReaderOverlay({
             >
               {/* Flat "doc" surface: no outer card, no rounded container. */}
               <MemoryPreview
+                key={displayedDraft ? `draft:${displayedDraft.created_at ?? `${displayedDraft.session_id}:${displayedDraft.message_id}`}` : `memory:${displayedMemory?.id}`}
                 memory={displayedMemory || (displayedDraft ? {
                   id: -1, // Temporary ID for draft
                   folder_id: (displayedDraft as any)?.folder_id ?? null,
@@ -363,7 +376,8 @@ export function MemoryReaderOverlay({
                   title: displayedDraft.title,
                   _isTitleGenerating: (displayedDraft as any)?._isTitleGenerating ?? false,
                   summary: displayedDraft.summary,
-                  created_at: new Date().toISOString(),
+                  doc_json: displayedDraft.doc_json,
+                  created_at: displayedDraft.created_at,
                   tags: null,
                   importance: null,
                   session_id: displayedDraft.session_id,
@@ -383,6 +397,7 @@ export function MemoryReaderOverlay({
                 embedded
                 onCloseEmbedded={onClose}
                 embeddedTopBarToolbarTargetId="db-memory-topbar-toolbar"
+                embeddedToolbarEnabled={open && visible && contentVisible}
                 onEmbeddedToolbarVisibleChange={onToolbarVisibleChange}
                 forceEditMemoryId={forceEditMemoryId || (displayedDraft ? -1 : null)}
                 isDraft={!!displayedDraft}

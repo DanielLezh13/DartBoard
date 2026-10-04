@@ -20,13 +20,10 @@ import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import { marked } from "marked";
 import TurndownService from "turndown";
 import MemoryBodyPreview from "./MemoryBodyPreview";
+import MemoryEditorToolbar, { memoryToolbarButtonClass } from "./MemoryEditorToolbar";
+import { Table2 } from "lucide-react";
 import { AdjacentColumnResize } from "@/components/vault/extensions/adjacentColumnResize";
-import {
-  LineHeight,
-  LINE_HEIGHT_CHOICES,
-  LINE_HEIGHT_DEFAULT,
-  getEditorLineHeight,
-} from "@/components/vault/extensions/lineHeight";
+import { LineHeight } from "@/components/vault/extensions/lineHeight";
 import {
   normalizeMemoryDocJson,
   parseMemoryDocJson,
@@ -102,6 +99,8 @@ interface MemoryPreviewProps {
    * If provided, the toolbar will render into this element while editing.
    */
   embeddedTopBarToolbarTargetId?: string;
+  /** Hide the embedded toolbar while its document is closing or changing. */
+  embeddedToolbarEnabled?: boolean;
   /**
    * Notify parent when the embedded toolbar is visible so the TopBar can fade out dates, etc.
    */
@@ -546,6 +545,7 @@ export default function MemoryPreview({
   embedded = false,
   onCloseEmbedded,
   embeddedTopBarToolbarTargetId,
+  embeddedToolbarEnabled = true,
   onEmbeddedToolbarVisibleChange,
   attachedMemoryIds = [],
   attachedMemories = [],
@@ -578,7 +578,6 @@ export default function MemoryPreview({
   const [toolbarTargetEl, setToolbarTargetEl] = useState<HTMLElement | null>(null);
   const [titleLoadingDots, setTitleLoadingDots] = useState(1);
   const [titleRevealVisible, setTitleRevealVisible] = useState(true);
-  const [lineHeightValue, setLineHeightValue] = useState<string>(LINE_HEIGHT_DEFAULT);
   const prevTitleGeneratingRef = useRef(false);
   const memoryId = (memory as any)?.id ?? null;
   const memorySessionId = (memory as any)?.session_id ?? null;
@@ -612,6 +611,13 @@ export default function MemoryPreview({
       codeBlockStyle: "fenced",
     })
   );
+
+  useEffect(() => {
+    turndownService.current.addRule("strikethrough", {
+      filter: (node) => ["S", "DEL", "STRIKE"].includes(node.nodeName),
+      replacement: (content) => content ? `~~${content}~~` : "",
+    });
+  }, []);
 
   // TipTap editor instance - single stable instance for both view and edit
   // Only initialize when memory exists
@@ -657,6 +663,9 @@ export default function MemoryPreview({
     editable: false, // Start as non-editable (view mode)
     editorProps: {
       attributes: {
+        role: "textbox",
+        "aria-label": "Memory body",
+        "aria-multiline": "true",
         class:
           "ProseMirror memory-preview-markdown prose prose-invert prose-sm max-w-none w-full min-h-[420px] px-6 py-5 leading-relaxed focus:outline-none",
       },
@@ -744,30 +753,18 @@ export default function MemoryPreview({
     }
     const el = document.getElementById(embeddedTopBarToolbarTargetId);
     setToolbarTargetEl(el);
-  }, [embedded, embeddedTopBarToolbarTargetId]);
+  }, [embedded, embeddedTopBarToolbarTargetId, embeddedToolbarEnabled]);
 
-  const shouldShowEmbeddedToolbar = !!(embedded && isEditing && editor);
+  const shouldShowEmbeddedToolbar = !!(
+    embedded && embeddedToolbarEnabled && isEditing && editor && !editor.isDestroyed && toolbarTargetEl
+  );
 
-  useEffect(() => {
-    if (!editor) {
-      setLineHeightValue(LINE_HEIGHT_DEFAULT);
-      return;
-    }
-    const syncLineHeight = () => setLineHeightValue(getEditorLineHeight(editor));
-    syncLineHeight();
-    editor.on("selectionUpdate", syncLineHeight);
-    editor.on("transaction", syncLineHeight);
-    return () => {
-      editor.off("selectionUpdate", syncLineHeight);
-      editor.off("transaction", syncLineHeight);
-    };
-  }, [editor]);
-
-  // Tell parent when the embedded toolbar is active so it can hide dates, etc.
+  // The document owns toolbar visibility, including transition and teardown states.
   useEffect(() => {
     if (!embedded) return;
     onEmbeddedToolbarVisibleChange?.(shouldShowEmbeddedToolbar);
-  }, [embedded, shouldShowEmbeddedToolbar, onEmbeddedToolbarVisibleChange]);
+    return () => onEmbeddedToolbarVisibleChange?.(false);
+  }, [embedded, shouldShowEmbeddedToolbar, editor, memoryKey, onEmbeddedToolbarVisibleChange]);
 
   useEffect(() => {
     if (!isDraftTitleGenerating) {
@@ -879,6 +876,7 @@ export default function MemoryPreview({
       editor.setEditable(isEditing);
       // Update CSS classes dynamically
       const editorDom = editor.view.dom;
+      editorDom.setAttribute("aria-readonly", String(!isEditing));
       if (isEditing) {
         editorDom.classList.remove("tiptap-readonly");
         editorDom.classList.add("tiptap-editing");
@@ -901,7 +899,7 @@ export default function MemoryPreview({
 
     const parsedDoc = parseMemoryDocJson(memoryDocJson);
     if (parsedDoc) {
-      editor.commands.setContent(parsedDoc, false);
+      editor.chain().setContent(parsedDoc, false).setMeta("addToHistory", false).run();
       requestAnimationFrame(() => {
         if (!editor.isDestroyed) applyMissingTableColWidths(editor, TABLE_RIGHT_WALL_INSET_PX);
       });
@@ -909,14 +907,14 @@ export default function MemoryPreview({
     }
 
     if (!memorySummary || memorySummary.trim() === "") {
-      editor.commands.setContent("<p></p>", false); // Empty paragraph instead of empty string
+      editor.chain().setContent("<p></p>", false).setMeta("addToHistory", false).run(); // Empty paragraph instead of empty string
       return;
     }
 
     Promise.resolve(marked.parse(memorySummary))
       .then((html) => {
         if (editor && !editor.isDestroyed) {
-          editor.commands.setContent(typeof html === 'string' ? html : String(html), false);
+          editor.chain().setContent(typeof html === 'string' ? html : String(html), false).setMeta("addToHistory", false).run();
           requestAnimationFrame(() => {
             if (!editor.isDestroyed) applyMissingTableColWidths(editor, TABLE_RIGHT_WALL_INSET_PX);
           });
@@ -925,7 +923,7 @@ export default function MemoryPreview({
       .catch((err) => {
         console.error("Error parsing markdown:", err);
         if (editor && !editor.isDestroyed) {
-          editor.commands.setContent(`<p>${memorySummary.replace(/\n/g, "<br>")}</p>`, false);
+          editor.chain().setContent(`<p>${memorySummary.replace(/\n/g, "<br>")}</p>`, false).setMeta("addToHistory", false).run();
         }
       });
   }, [editor, hasMemory, memoryId, memorySummary, memoryDocJson]);
@@ -943,6 +941,14 @@ export default function MemoryPreview({
       onEditHandled?.();
     }
   }, [forceEditMemoryId, hasMemory, memoryId, isDraft, editor, onEditHandled]);
+
+  useEffect(() => {
+    if (!isDraft || !editor || editor.isDestroyed) return;
+    const frame = requestAnimationFrame(() => {
+      if (!editor.isDestroyed) editor.commands.focus("start", { scrollIntoView: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editor, isDraft]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -974,16 +980,6 @@ export default function MemoryPreview({
     }
   }, [isEditingExcerpt]);
 
-  // Cleanup editor only on component unmount
-  useEffect(() => {
-    return () => {
-      if (editor && !editor.isDestroyed) {
-        editor.destroy();
-      }
-    };
-  }, [editor]);
-
-
   useEffect(() => {
     if (externalError) {
       setError(externalError);
@@ -1008,6 +1004,19 @@ export default function MemoryPreview({
     observer.observe(el);
     return () => observer.disconnect();
   }, [isEditing]);
+
+  useEffect(() => {
+    if (!showTableInsertPicker) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setShowTableInsertPicker(false);
+      tableInsertButtonRef.current?.focus();
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [showTableInsertPicker]);
 
   useEffect(() => {
     if (!editor) return;
@@ -1592,13 +1601,13 @@ export default function MemoryPreview({
     if (editor && memory.summary !== undefined) {
       const parsedDoc = parseMemoryDocJson(memoryDocJson);
       if (parsedDoc) {
-        editor.commands.setContent(parsedDoc, false);
+        editor.chain().setContent(parsedDoc, false).setMeta("addToHistory", false).run();
       } else {
         const markdown = memory.summary || "";
         Promise.resolve(marked.parse(markdown))
           .then((html) => {
             if (editor && !editor.isDestroyed) {
-              editor.commands.setContent(typeof html === 'string' ? html : String(html), false);
+              editor.chain().setContent(typeof html === 'string' ? html : String(html), false).setMeta("addToHistory", false).run();
             }
           })
           .catch((err) => {
@@ -2457,209 +2466,86 @@ export default function MemoryPreview({
                   )}
 
                   {/* Formatting toolbar */}
-                  {isEditing && editor && (() => {
-                    const formatButtonClass = (active: boolean) =>
-                      `shrink-0 rounded px-1.5 py-[3px] text-[11px] leading-none transition-colors ${
-                        active
-                          ? "bg-gray-700 text-white"
-                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                      }`;
-                    const tableButtonClass =
-                      "shrink-0 rounded px-1.5 py-[3px] text-[11px] leading-none text-gray-300 hover:bg-gray-800 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-gray-400";
-                    const toolbarShellClass = embedded
-                      ? "inline-flex min-w-max items-center gap-1 whitespace-nowrap rounded-lg border border-blue-500/25 bg-transparent px-2 py-1"
-                      : "inline-flex items-center gap-2 rounded-xl border border-blue-500/25 bg-transparent px-4 py-2 flex-wrap";
-
+                  {isEditing && editor && (!embedded || embeddedToolbarEnabled) && (() => {
                     const toolbar = (
-                      <div className={embedded ? "flex h-full w-full items-center justify-center px-1" : "sticky top-0 z-10 pb-3 bg-transparent -mx-3 px-3"}>
-                        <div className={embedded ? "w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : "flex justify-center"}>
-                          <div className={toolbarShellClass}>
+                      <MemoryEditorToolbar
+                        editor={editor}
+                        embedded={embedded}
+                        tableControl={
+                          <div className="relative" ref={tableInsertPickerRef}>
                             <button
+                              ref={tableInsertButtonRef}
                               type="button"
-                              onClick={() => editor.chain().focus().undo().run()}
-                              disabled={!editor.can().undo()}
-                              className={tableButtonClass}
-                              title="Undo"
-                            >
-                              Undo
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().redo().run()}
-                              disabled={!editor.can().redo()}
-                              className={tableButtonClass}
-                              title="Redo"
-                            >
-                              Redo
-                            </button>
-                            <div className="mx-0.5 h-4 w-px bg-gray-700" />
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleBold().run()}
-                              className={`${formatButtonClass(editor.isActive("bold"))} ${editor.isActive("bold") ? "font-bold" : ""}`}
-                              title="Bold"
-                            >
-                              <strong>B</strong>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleItalic().run()}
-                              className={`${formatButtonClass(editor.isActive("italic"))} ${editor.isActive("italic") ? "italic" : ""}`}
-                              title="Italic"
-                            >
-                              <em>I</em>
-                            </button>
-                            <div className="mx-0.5 h-4 w-px bg-gray-700" />
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                              className={formatButtonClass(editor.isActive("heading", { level: 1 }))}
-                              title="Heading 1"
-                            >
-                              H1
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                              className={formatButtonClass(editor.isActive("heading", { level: 2 }))}
-                              title="Heading 2"
-                            >
-                              H2
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-                              className={formatButtonClass(editor.isActive("heading", { level: 3 }))}
-                              title="Heading 3"
-                            >
-                              H3
-                            </button>
-                            <select
-                              value={lineHeightValue}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                if (value === LINE_HEIGHT_DEFAULT) {
-                                  editor.chain().focus().unsetLineHeight().run();
-                                  return;
-                                }
-                                editor.chain().focus().setLineHeight(value as (typeof LINE_HEIGHT_CHOICES)[number]).run();
+                              onClick={() => {
+                                setShowTableInsertPicker((prev) => !prev);
+                                setTablePickerHover(null);
                               }}
-                              className="h-6 shrink-0 rounded border border-gray-700 bg-gray-900 px-1.5 text-[11px] text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                              title="Line spacing"
+                              disabled={effectiveMaxColumns < 1}
+                              className={`${memoryToolbarButtonClass} ${showTableInsertPicker ? "bg-blue-500/20 text-blue-200" : ""}`}
+                              onMouseDown={(event) => event.preventDefault()}
+                              aria-label="Insert table"
+                              aria-expanded={showTableInsertPicker}
+                              title="Insert table"
                             >
-                              <option value={LINE_HEIGHT_DEFAULT}>Line</option>
-                              {LINE_HEIGHT_CHOICES.map((choice) => (
-                                <option key={choice} value={choice}>
-                                  {choice}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="mx-0.5 h-4 w-px bg-gray-700" />
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleBulletList().run()}
-                              className={formatButtonClass(editor.isActive("bulletList"))}
-                              title="Bullet List"
-                            >
-                              •
+                              <Table2 size={16} />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                              className={formatButtonClass(editor.isActive("orderedList"))}
-                              title="Numbered List"
-                            >
-                              1.
-                            </button>
-                            <div className="mx-0.5 h-4 w-px bg-gray-700" />
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                              className={formatButtonClass(editor.isActive("blockquote"))}
-                              title="Quote"
-                            >
-                              ❝
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => editor.chain().focus().toggleCode().run()}
-                              className={formatButtonClass(editor.isActive("code"))}
-                              title="Inline Code"
-                            >
-                              {"</>"}
-                            </button>
-                            <div className="mx-0.5 h-4 w-px bg-gray-700" />
-                            <div className="relative" ref={tableInsertPickerRef}>
-                              <button
-                                ref={tableInsertButtonRef}
-                                type="button"
-                                onClick={() => {
-                                  setShowTableInsertPicker((prev) => !prev);
-                                  setTablePickerHover(null);
-                                }}
-                                disabled={effectiveMaxColumns < 1}
-                                className={`${tableButtonClass} ${showTableInsertPicker ? "bg-gray-700 text-white" : ""}`}
-                                title="Insert table"
-                              >
-                                Table
-                              </button>
-                              {showTableInsertPicker &&
-                                typeof document !== "undefined" &&
-                                createPortal(
+                            {showTableInsertPicker &&
+                              typeof document !== "undefined" &&
+                              createPortal(
+                                <div
+                                  ref={tableInsertPopupRef}
+                                  className="fixed rounded-xl border border-slate-700 bg-slate-950 p-2 z-[140] shadow-2xl shadow-black/70 w-max"
+                                  style={{
+                                    top: tablePickerPosition.top,
+                                    left: tablePickerPosition.left,
+                                  }}
+                                  onMouseLeave={() => setTablePickerHover(null)}
+                                >
+                                  <div className="text-[11px] text-slate-300 mb-1 w-max mx-auto text-left">
+                                    {insertPickerPreview.rows} x {insertPickerPreview.cols}
+                                  </div>
                                   <div
-                                    ref={tableInsertPopupRef}
-                                    className="fixed rounded-xl border border-slate-700 bg-slate-950 p-2 z-[140] shadow-2xl shadow-black/70 w-max"
+                                    className="grid gap-0 border border-slate-700 w-max mx-auto"
                                     style={{
-                                      top: tablePickerPosition.top,
-                                      left: tablePickerPosition.left,
+                                      gridTemplateColumns: `repeat(${maxInsertPickerCols}, minmax(0, 1fr))`,
                                     }}
-                                    onMouseLeave={() => setTablePickerHover(null)}
                                   >
-                                    <div className="text-[11px] text-slate-300 mb-1 w-max mx-auto text-left">
-                                      {insertPickerPreview.rows} x {insertPickerPreview.cols}
-                                    </div>
-                                    <div
-                                      className="grid gap-0 border border-slate-700 w-max mx-auto"
-                                      style={{
-                                        gridTemplateColumns: `repeat(${maxInsertPickerCols}, minmax(0, 1fr))`,
-                                      }}
-                                    >
-                                      {Array.from({
-                                        length: maxInsertPickerRows * maxInsertPickerCols,
-                                      }).map((_, index) => {
-                                        const row = Math.floor(index / maxInsertPickerCols) + 1;
-                                        const col = (index % maxInsertPickerCols) + 1;
-                                        const selected =
-                                          row <= insertPickerPreview.rows &&
-                                          col <= insertPickerPreview.cols;
+                                    {Array.from({
+                                      length: maxInsertPickerRows * maxInsertPickerCols,
+                                    }).map((_, index) => {
+                                      const row = Math.floor(index / maxInsertPickerCols) + 1;
+                                      const col = (index % maxInsertPickerCols) + 1;
+                                      const selected =
+                                        row <= insertPickerPreview.rows &&
+                                        col <= insertPickerPreview.cols;
 
-                                        return (
-                                          <button
-                                            key={`table-grid-${row}-${col}`}
-                                            type="button"
-                                            className={`h-5 w-5 rounded-none border border-slate-700 transition-colors ${
-                                              selected
-                                                ? "bg-blue-500/60"
-                                                : "bg-slate-900 hover:bg-blue-500/35"
-                                            }`}
-                                            onMouseEnter={() => setTablePickerHover({ rows: row, cols: col })}
-                                            onFocus={() => setTablePickerHover({ rows: row, cols: col })}
-                                            onClick={() => insertTable(row, col)}
-                                            aria-label={`Insert ${row} by ${col} table`}
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                    <div className="mt-1 text-[10px] text-slate-500">
-                                      Max {effectiveMaxColumns} columns in this width.
-                                    </div>
-                                  </div>,
-                                  document.body
-                                )}
-                            </div>
+                                      return (
+                                        <button
+                                          key={`table-grid-${row}-${col}`}
+                                          type="button"
+                                          className={`h-5 w-5 rounded-none border border-slate-700 transition-colors ${
+                                            selected
+                                              ? "bg-blue-500/60"
+                                              : "bg-slate-900 hover:bg-blue-500/35"
+                                          }`}
+                                          onMouseEnter={() => setTablePickerHover({ rows: row, cols: col })}
+                                          onFocus={() => setTablePickerHover({ rows: row, cols: col })}
+                                          onMouseDown={(event) => event.preventDefault()}
+                                          onClick={() => insertTable(row, col)}
+                                          aria-label={`Insert ${row} by ${col} table`}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="mt-1 text-[10px] text-slate-500">
+                                    Max {effectiveMaxColumns} columns in this width.
+                                  </div>
+                                </div>,
+                                document.body
+                              )}
                           </div>
-                        </div>
-                      </div>
+                        }
+                      />
                     );
 
                     if (embedded && toolbarTargetEl) return createPortal(toolbar, toolbarTargetEl);

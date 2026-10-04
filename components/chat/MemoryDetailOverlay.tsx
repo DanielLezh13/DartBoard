@@ -174,9 +174,12 @@ export function MemoryDetailOverlay({
         });
         return;
       }
-      // Draft changed - swap it (only if content changes, not title)
-      if (displayedDraft.summary !== draftMemory.summary) {
-        onToolbarVisibleChange?.(false);
+      // A new draft gets a fresh editor; generated title updates keep the current one.
+      if (
+        displayedDraft.created_at !== draftMemory.created_at ||
+        displayedDraft.summary !== draftMemory.summary ||
+        displayedDraft.doc_json !== draftMemory.doc_json
+      ) {
         if (swapTimerRef.current != null) {
           window.clearTimeout(swapTimerRef.current);
           swapTimerRef.current = null;
@@ -235,9 +238,6 @@ export function MemoryDetailOverlay({
       }
       return;
     }
-
-    // Hide any topbar toolbar during swap (prevents stale toolbar from lingering).
-    onToolbarVisibleChange?.(false);
 
     // Cancel any in-flight swap.
     if (swapTimerRef.current != null) {
@@ -370,6 +370,7 @@ export function MemoryDetailOverlay({
             >
               {/* Flat "doc" surface: no outer card, no rounded container. */}
               <MemoryPreview
+                key={displayedDraft ? `draft:${displayedDraft.created_at ?? `${displayedDraft.session_id}:${displayedDraft.message_id}`}` : `memory:${displayedMemory?.id}`}
                 memory={displayedMemory || (displayedDraft ? {
                   id: -1, // Temporary ID for draft
                   folder_id: (displayedDraft as any)?.folder_id ?? null,
@@ -377,7 +378,8 @@ export function MemoryDetailOverlay({
                   title: displayedDraft.title,
                   _isTitleGenerating: (displayedDraft as any)?._isTitleGenerating ?? false,
                   summary: displayedDraft.summary,
-                  created_at: new Date().toISOString(),
+                  doc_json: displayedDraft.doc_json,
+                  created_at: displayedDraft.created_at,
                   tags: null,
                   importance: null,
                   session_id: displayedDraft.session_id,
@@ -397,6 +399,7 @@ export function MemoryDetailOverlay({
                 embedded
                 onCloseEmbedded={onClose}
                 embeddedTopBarToolbarTargetId="db-memory-topbar-toolbar"
+                embeddedToolbarEnabled={open && visible && contentVisible}
                 onEmbeddedToolbarVisibleChange={onToolbarVisibleChange}
                 forceEditMemoryId={forceEditMemoryId || (displayedDraft ? -1 : null)}
                 isDraft={!!displayedDraft}

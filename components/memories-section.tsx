@@ -27,7 +27,7 @@ export function MemoriesSection() {
   return (
     <section className="relative px-4 py-24">
       {/* Background accent */}
-      <div className="pointer-events-none absolute left-0 top-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-500/20 blur-[150px]" />
+      <div aria-hidden="true" className="db-marketing-glow db-marketing-glow-purple pointer-events-none absolute left-0 top-1/2 -z-10 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2" />
       
       <div className="mx-auto max-w-6xl">
         {/* Section Header */}
@@ -45,7 +45,7 @@ export function MemoriesSection() {
           {memoryFeatures.map((feature, index) => (
             <div
               key={feature.title}
-              className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-900/50 p-8 backdrop-blur-sm transition-all hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(168,85,247,0.1)]"
+              className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-900/50 p-8 transition-all hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(168,85,247,0.1)]"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
               <div className="relative">

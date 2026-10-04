@@ -24,9 +24,9 @@ import type { ArchiveMessage } from "@/lib/archive/types";
 import { stripExportArtifacts } from "@/lib/stripExportArtifacts";
 import { useScope } from "../../hooks/useScope";
 
-// Enhanced glass-morphism card styles matching v2 mockup exactly
+// Opaque card surfaces avoid backdrop filtering across long scrolling content.
 const archiveCardStyles = {
-  base: "group relative isolate overflow-hidden rounded-xl border border-blue-500/30 bg-card/60 p-6 shadow-none backdrop-blur-md transition-all duration-300",
+  base: "group relative isolate overflow-hidden rounded-xl border border-blue-500/30 bg-[#111b2e] p-6 shadow-none transition-all duration-300",
   inner: "bg-card/40 border border-blue-500/20 rounded-lg backdrop-blur-sm",
   warning: "bg-warning/10 border border-warning/50 rounded-xl p-3 backdrop-blur-sm",
   button: "inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 hover:border-blue-400/40 rounded-lg font-medium text-blue-400 hover:text-blue-300 transition-all duration-200",
@@ -2030,9 +2030,9 @@ function ArchivePageInner() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0d1525] via-[#0e1628] to-[#0d1525]">
+      <div className="db-scroll-page bg-gradient-to-br from-[#0d1525] via-[#0e1628] to-[#0d1525]">
         {/* Top bar (match v2 mockup styling) */}
-        <div className="sticky top-0 z-30 h-12 flex-shrink-0 border-b border-blue-500/30 bg-slate-900/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.3),0_2px_4px_rgba(0,0,0,0.2)]">
+        <div className="relative z-30 h-12 flex-shrink-0 border-b border-blue-500/30 bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.3),0_2px_4px_rgba(0,0,0,0.2)]">
           <div className="h-full px-3 flex items-center justify-between w-full">
             {/* Left column - Back to Chat button */}
             <div className="w-1/3 flex items-center justify-start">
@@ -2095,7 +2095,7 @@ function ArchivePageInner() {
           </div>
         </div>
 
-        <div className="flex-1">
+        <div className="db-page-scroll" role="region" aria-label="Archive content" tabIndex={0}>
           <div className="mx-auto max-w-[1100px] px-6 py-8">
             <div className="space-y-6">
         {/* Import Section - matching v2 ImportCard design exactly */}
@@ -2864,7 +2864,7 @@ function ArchivePageInner() {
 
         {/* Results */}
         {showArchiveContent && (
-        <div className="space-y-4 isolate" style={getEntranceStyle(showLowerReveal, 180)}>
+        <div className="space-y-4" style={{ visibility: showLowerReveal ? "visible" : "hidden" }}>
           <ArchivePaginationControls
             placement="top"
             totalPages={totalPages}

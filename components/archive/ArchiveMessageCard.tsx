@@ -11,7 +11,9 @@ import { VaultIcon } from "@/components/icons/VaultIcon";
 import type { ArchiveMessage } from "@/lib/archive/types";
 
 const archiveMessageCardBase =
-  "group relative isolate overflow-hidden rounded-xl border border-blue-500/30 bg-card/60 p-6 shadow-none backdrop-blur-md transition-[border-color,box-shadow] duration-200";
+  // Messages can be taller than the viewport. Paint the tint directly instead
+  // of allocating a backdrop-filter surface for the entire message.
+  "group relative isolate overflow-hidden rounded-xl border border-blue-500/30 bg-[#0e1628] bg-gradient-to-br from-blue-500/10 to-transparent p-6 shadow-none transition-[border-color,box-shadow] duration-200";
 const markdownRemarkPlugins = [remarkGfm];
 const markdownRehypePlugins = [rehypeHighlight];
 
@@ -67,7 +69,6 @@ const ArchiveMessageCard = React.memo(function ArchiveMessageCard({
         isHighlighted ? "border-blue-500 shadow-lg shadow-blue-500/30" : ""
       }`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-100 transition-opacity duration-300 group-hover:opacity-100 rounded-xl pointer-events-none" />
       <div className="relative">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2 flex-wrap text-xs">

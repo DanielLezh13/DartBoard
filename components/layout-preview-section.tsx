@@ -30,7 +30,7 @@ export function LayoutPreviewSection() {
   return (
     <section className="relative px-4 py-24">
       {/* Background accent */}
-      <div className="pointer-events-none absolute right-0 top-1/2 -z-10 h-[600px] w-[600px] translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/15 blur-[150px]" />
+      <div aria-hidden="true" className="db-marketing-glow pointer-events-none absolute right-0 top-1/2 -z-10 h-[900px] w-[900px] translate-x-1/2 -translate-y-1/2" />
 
       <div className="mx-auto max-w-6xl">
         {/* Section Header */}
@@ -45,7 +45,7 @@ export function LayoutPreviewSection() {
         </div>
 
         {/* Layout Preview */}
-        <div className="overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-900/50 p-2 shadow-[0_0_60px_rgba(59,130,246,0.1)] backdrop-blur-sm">
+        <div className="overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-900/50 p-2 shadow-[0_0_60px_rgba(59,130,246,0.1)]">
           <div className="grid min-h-[500px] gap-2 lg:grid-cols-[280px_1fr_280px]">
             {/* Left Panel - Sessions */}
             <div className="flex rounded-xl border border-blue-500/20 bg-slate-800/30">

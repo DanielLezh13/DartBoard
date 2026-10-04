@@ -86,7 +86,7 @@ export function HeroSection() {
         </div>
 
         {/* Decorative glow */}
-        <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 blur-[120px]" />
+        <div aria-hidden="true" className="db-marketing-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[900px] w-[900px] -translate-x-1/2 -translate-y-1/2" />
       </div>
     </section>
   )

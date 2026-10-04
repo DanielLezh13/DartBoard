@@ -92,12 +92,14 @@
   html {
     background-color: oklch(0.12 0.02 250);
     min-height: 100vh;
+    min-height: 100dvh;
   }
   
   body {
     background-color: oklch(0.12 0.02 250);
     color: oklch(0.95 0.01 250);
     min-height: 100vh;
+    min-height: 100dvh;
   }
   
   /* Prevent white overscroll background */
@@ -138,6 +140,7 @@
 
   #db-theme-root {
     min-height: 100vh;
+    min-height: 100dvh;
     background-color: var(--background);
     filter: var(--db-ui-theme-filter);
     transition: filter 240ms ease;
@@ -218,25 +221,45 @@
 @tailwind utilities;
 
 @layer utilities {
+  /* Keep long pages off the document's scrolling paint surface. The shell
+     paints a stationary viewport background; only its content lane scrolls. */
+  .db-scroll-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .db-page-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: none;
+  }
+
   .db-marketing-bg {
     background-color: #080b12;
+    /* Paint the subtle grid with the page; fixed blended SVG noise and large
+       blur filters force extra surfaces during rapid iframe scrolling. */
     background-image:
+      linear-gradient(rgba(148, 163, 184, 0.005) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.004) 1px, transparent 1px),
       linear-gradient(115deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.08) 44%, rgba(20, 184, 166, 0.055) 58%, rgba(59, 130, 246, 0) 76%),
       radial-gradient(ellipse 125% 72% at 50% -18%, rgba(77, 127, 255, 0.18), rgba(77, 127, 255, 0) 64%),
       radial-gradient(ellipse 100% 58% at 50% 45%, rgba(20, 184, 166, 0.075), rgba(20, 184, 166, 0) 72%),
       linear-gradient(180deg, #0b1020 0%, #090d17 38%, #080b12 72%, #0a0d14 100%);
-    background-repeat: no-repeat;
+    background-size: 72px 72px, 72px 72px, auto, auto, auto, auto;
+    background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   }
 
-  .db-marketing-bg-noise {
-    background-image:
-      linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 72px 72px, 72px 72px, 180px 180px;
-    opacity: 0.12;
-    mix-blend-mode: soft-light;
-    pointer-events: none;
+  .db-marketing-glow {
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.045) 38%, rgba(59, 130, 246, 0) 70%);
+  }
+
+  .db-marketing-glow-purple {
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.14) 0%, rgba(168, 85, 247, 0.055) 38%, rgba(168, 85, 247, 0) 70%);
   }
 
   /* DartBoard scroll lanes: keep scrollbars slim and dark, avoid default bright hover scrollbars. */

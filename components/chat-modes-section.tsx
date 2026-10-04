@@ -37,7 +37,7 @@ export function ChatModesSection() {
   return (
     <section className="relative px-4 py-24">
       {/* Background accent */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/10 blur-[150px]" />
+      <div aria-hidden="true" className="db-marketing-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[900px] w-[900px] -translate-x-1/2 -translate-y-1/2" />
       
       <div className="mx-auto max-w-6xl">
         {/* Section Header */}

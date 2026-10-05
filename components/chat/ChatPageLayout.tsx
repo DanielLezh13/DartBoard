@@ -28,6 +28,7 @@ import { RightDock } from "@/components/chat/RightDock";
 import { MemoryReaderOverlay } from "@/components/chat/MemoryReaderOverlay";
 import { FloatingChatComposer } from "@/components/chat/FloatingChatComposer";
 import { ChatDropzoneTarget } from "@/components/chat/ChatDropzoneTarget";
+import { MemoryDragPreview } from "@/components/chat/MemoryDragPreview";
 import { LandingInjectedMemories } from "@/components/chat/LandingInjectedMemories";
 import { ToastContainer } from "@/components/ui/Toast";
 import { PricingModal } from "@/components/chat/PricingModal";
@@ -1321,7 +1322,12 @@ export function ChatPageLayout(props: ChatPageLayoutProps) {
 
             {/* Chat dropzone wrapper */}
             <div className="relative h-full w-full min-h-0">
-              <ChatDropzoneTarget activeDragId={activeDragId} memoryOverlayOpen={memoryOverlayOpen} />
+              <ChatDropzoneTarget
+                activeDragId={activeDragId}
+                currentOverId={currentOverId}
+                memoryOverlayOpen={memoryOverlayOpen}
+                coveredRightPx={layoutMode === "narrow" && rightOverlayOpen ? RIGHT_PANEL_W_CLEAN : 0}
+              />
 
             {/* Messages scroll container (hidden when landing) */}
             <div
@@ -1895,7 +1901,8 @@ export function ChatPageLayout(props: ChatPageLayoutProps) {
             onCreateMemory={openBlankMemoryDraft}
             loading={memoryLoading}
           />
-          {/* Memory + memory-folder drag overlay (same approach as left rail; no createPortal) */}
+          {/* Escape the sidebar's clipping and stacking layers while dragging. */}
+          {typeof document !== "undefined" ? createPortal(
           <DragOverlay adjustScale={false} dropAnimation={null}>
             {activeDragId?.startsWith("memory-folder-") ? (
               (() => {
@@ -1917,21 +1924,10 @@ export function ChatPageLayout(props: ChatPageLayoutProps) {
 	              (() => {
 	                const memory = memories.find((m: any) => m.id === dragOverlayMemoryId);
 	                if (!memory) return null;
-	                const title = memory.title || "Untitled";
-                return (
-                  <div style={{ width: "240px", pointerEvents: "none" }}>
-                    <div className="rounded-md px-2.5 py-1.5 bg-slate-800/95 border border-slate-600/50 shadow-xl"
-                         style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-[3px] h-7 rounded-full bg-blue-400/90 flex-shrink-0" />
-                        <div className="text-sm font-medium text-gray-100 truncate min-w-0">{title}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
+                return <MemoryDragPreview title={memory.title} />;
               })()
             ) : null}
-          </DragOverlay>
+          </DragOverlay>, document.body) : null}
               </div>
                 </div>
               </div>
@@ -2057,7 +2053,7 @@ export function ChatPageLayout(props: ChatPageLayoutProps) {
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}
                   >
-                    <ChatDropzoneGhost enabled={Boolean(activeDragId?.startsWith("memory-") && !activeDragId?.includes("folder"))} />
+                    <ChatDropzoneGhost enabled={!memoryOverlayOpen && /^memory-\d+$/.test(activeDragId ?? "")} />
                     <RightDock
                       open={true}
                       showOuterDivider={false}
@@ -2151,18 +2147,7 @@ export function ChatPageLayout(props: ChatPageLayoutProps) {
 	                              (() => {
 	                                const memory = memories.find((m: any) => m.id === dragOverlayMemoryId);
 	                                if (!memory) return null;
-	                                const title = memory.title || "Untitled";
-                                return (
-                                  <div style={{ width: "240px", pointerEvents: "none" }}>
-                                    <div className="rounded-md px-2.5 py-1.5 bg-slate-800/95 border border-slate-600/50 shadow-xl"
-                                         style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-[3px] h-7 rounded-full bg-blue-400/90 flex-shrink-0" />
-                                        <div className="text-sm font-medium text-gray-100 truncate min-w-0">{title}</div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
+                                return <MemoryDragPreview title={memory.title} />;
                               })()
                             ) : null}
                           </DragOverlay>,

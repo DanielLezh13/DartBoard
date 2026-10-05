@@ -1,17 +1,21 @@
 "use client";
 
 import { useState, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useDroppable } from "@dnd-kit/core";
 
 export function ChatDropzoneGhost({ enabled }: { enabled: boolean }) {
-  const { setNodeRef } = useDroppable({ id: "chat-dropzone" });
+  const { setNodeRef } = useDroppable({ id: "chat-dropzone", disabled: !enabled });
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const measure = useCallback(() => {
     if (typeof document === "undefined") return;
     const el = document.querySelector('[data-chat-dropzone="true"]') as HTMLElement | null;
     const r = el?.getBoundingClientRect() ?? null;
-    setRect(r);
+    setRect((prev) => {
+      if (prev && r && prev.left === r.left && prev.top === r.top && prev.width === r.width && prev.height === r.height) return prev;
+      return r;
+    });
   }, []);
 
   useLayoutEffect(() => {
@@ -30,9 +34,11 @@ export function ChatDropzoneGhost({ enabled }: { enabled: boolean }) {
     };
   }, [enabled, measure]);
 
-  if (!enabled || !rect) return null;
+  if (!enabled || !rect || typeof document === "undefined") return null;
 
-  return (
+  // Its coordinates belong to the viewport. The drawer's transformed wrapper
+  // would otherwise offset this fixed target into the sidebar.
+  return createPortal(
     <div
       ref={setNodeRef}
       style={{
@@ -44,10 +50,10 @@ export function ChatDropzoneGhost({ enabled }: { enabled: boolean }) {
         pointerEvents: "none",
         background: "transparent",
       }}
-    />
+    />,
+    document.body
   );
 }
-
 
 
 
